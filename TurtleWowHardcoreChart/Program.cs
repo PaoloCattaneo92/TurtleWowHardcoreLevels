@@ -1,5 +1,7 @@
 ﻿using HtmlAgilityPack;
+using System.Diagnostics;
 using System.Text;
+using TurtleWowHardcoreChart.BL;
 
 const int MAX_LEVEL = 60;
 
@@ -14,37 +16,34 @@ var htmlData = File.ReadAllText(fileName);
 var document = new HtmlDocument();
 document.LoadHtml(htmlData);
 
-var levelOfCharacters = ParseCharacters(document)
-    .Select(hero => int.Parse(ParseLevel(hero)))
-    .Where(level => level > 0);
+//var aliveHeroesLevels = HtmlHelp.GetAliveHeroes(document)
+//    .Select(hero => int.Parse(HtmlHelp.ParseLevel(hero)))
+//    .Where(level => level > 0);
 
-var countForLevel = new int[MAX_LEVEL];
-var levels = new int[MAX_LEVEL];
-for (int i = 0; i < MAX_LEVEL; i++)
-{
-    countForLevel[i] = levelOfCharacters.Count(x => x == i);
-    levels[i] = i;
-}
+//var aliveChartData = ChartHelp.CreateLevelChart(aliveHeroesLevels);
+//var alivePercentage = PercentageCalculator.GetPercentageData(aliveChartData);
+//var alivePercentageText = PercentageCalculator.BuildResultPercentageText(alivePercentage);
+//File.WriteAllText("alive_percentages.txt", alivePercentageText);
+//var aliveImage = await ChartHelp.GetChartImage(aliveChartData);
+//File.WriteAllBytes("alive_image.png", aliveImage);
 
-var totalChars = countForLevel.Sum();
+//var fallenHeroesLevels = HtmlHelp.GetFallenHeroes(document)
+//    .Select(hero => int.Parse(HtmlHelp.ParseLevel(hero)))
+//    .Where(level => level > 0);
+//var fallenChartData = ChartHelp.CreateLevelChart(fallenHeroesLevels);
+//var fallenPercentage = PercentageCalculator.GetPercentageData(fallenChartData);
+//var fallenPercentageText = PercentageCalculator.BuildResultPercentageText(fallenPercentage);
+//File.WriteAllText("fallen_percentages.txt", fallenPercentageText);
+//var fallenImage = await ChartHelp.GetChartImage(fallenChartData);
+//File.WriteAllBytes("fallen_image.png", fallenImage);
 
-var percentage = new double[5];
-for (int i = 0; i < percentage.Length; i++)
-{
-    percentage[i] = (double)countForLevel.AsEnumerable().Skip((i+1)*10).Take(10).Sum() / totalChars;
-}
+var immortalHeroes = HtmlHelp.GetImmortalHeroes(document)
+    .Select(HtmlHelp.ParseClass)
+    .Where(c => c != "-1");
+var immortalChartData = ChartHelp.CreateClassChart(immortalHeroes);
+var immortalImage = await ChartHelp.GetChartImage(immortalChartData);
+File.WriteAllBytes("immortal_image.png", immortalImage);
 
-StringBuilder sb = BuildResultPercentageText(percentage);
-File.WriteAllText("result_percentages.txt", sb.ToString());
-
-using var client = new HttpClient();
-
-var labels = string.Join(",", levels);
-var data = string.Join(", ", countForLevel);
-var result = await client.GetAsync("https://quickchart.io/chart?c={type:'bar',data:{labels:[" + labels + "],datasets:[{label:'Levels',data:[" + data + "]}]}}");
-var bin = await result.Content.ReadAsByteArrayAsync();
-
-File.WriteAllBytes("result_image.png", bin);
 
 static string? GetFileName(string[] args)
 {
@@ -57,33 +56,5 @@ static string? GetFileName(string[] args)
     var htmlFiles = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.htm|*.html");
     return htmlFiles.FirstOrDefault();
 }
-static List<HtmlNode> ParseCharacters(HtmlDocument document)
-{
-    return document.DocumentNode.ChildNodes[2].ChildNodes[3].ChildNodes[1].ChildNodes[1].ChildNodes[3].ChildNodes[1].ChildNodes[3].ChildNodes
-        .Where(h => h.Name == "tr")
-        .ToList();
-}
 
-static string ParseLevel(HtmlNode hero)
-{
-    return hero.ChildNodes[1].ChildNodes.FirstOrDefault(c => c.Name == "span")?.ChildNodes[0]?.InnerHtml ?? "-1";
-}
 
-static StringBuilder BuildResultPercentageText(double[] percentages)
-{
-    var tops = new double[5];
-
-    tops[0] = 1;
-    for (int i = 1; i < percentages.Length; i++)
-    {
-        tops[i] = tops[i-1] - percentages[i-1];
-    }
-
-    var sb = new StringBuilder().Append("Percentages: \n");
-    for (int i = 0; i < percentages.Length; i++)
-    {
-        sb.Append(i+1).Append("0-").Append(i+1).Append("9\t").Append(percentages[i].ToString("P")).Append("\tTop ").Append(tops[i].ToString("P")).Append('\n');
-    }
-
-    return sb;
-}
